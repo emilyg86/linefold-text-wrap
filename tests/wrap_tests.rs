@@ -1,4 +1,4 @@
-use linefold::wrap;
+use linefold::{wrap, wrap_indented};
 
 struct Case {
     name: &'static str,
@@ -109,6 +109,68 @@ fn wrap_table() {
             failures.push(format!(
                 "case '{}' failed:\n  input:    {:?}\n  width:    {}\n  expected: {:?}\n  got:      {:?}",
                 case.name, case.input, case.width, case.expected, got
+            ));
+        }
+    }
+
+    assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
+}
+
+struct IndentCase {
+    name: &'static str,
+    input: &'static str,
+    width: usize,
+    indent: usize,
+    expected: &'static str,
+}
+
+#[test]
+fn wrap_indented_table() {
+    let cases = vec![
+        IndentCase {
+            name: "indent is prepended to every packed line",
+            input: "one two three four",
+            width: 10,
+            indent: 2,
+            expected: "  one two\n  three\n  four",
+        },
+        IndentCase {
+            name: "paragraph-break blank lines stay unindented",
+            input: "first paragraph\n\nsecond paragraph",
+            width: 20,
+            indent: 2,
+            expected: "  first paragraph\n\n  second paragraph",
+        },
+        IndentCase {
+            name: "zero indent behaves exactly like wrap",
+            input: "a b c",
+            width: 3,
+            indent: 0,
+            expected: "a b\nc",
+        },
+        IndentCase {
+            name: "an indent as wide as the width is clamped, not overflowed",
+            input: "ab",
+            width: 3,
+            indent: 10,
+            expected: "  a\n  b",
+        },
+        IndentCase {
+            name: "empty input stays empty regardless of indent",
+            input: "",
+            width: 10,
+            indent: 4,
+            expected: "",
+        },
+    ];
+
+    let mut failures = Vec::new();
+    for case in &cases {
+        let got = wrap_indented(case.input, case.width, case.indent);
+        if got != case.expected {
+            failures.push(format!(
+                "case '{}' failed:\n  input:    {:?}\n  width:    {}\n  indent:   {}\n  expected: {:?}\n  got:      {:?}",
+                case.name, case.input, case.width, case.indent, case.expected, got
             ));
         }
     }

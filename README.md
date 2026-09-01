@@ -46,6 +46,19 @@ already have a single paragraph split into lines yourself, `wrap_words`
 skips the paragraph-splitting step and returns a `Vec<String>` of the
 wrapped lines directly.
 
+`wrap_indented` wraps like `wrap` and then indents every line by a
+fixed number of spaces, narrowing the packed text so the indent never
+pushes a line past the requested width:
+
+```rust
+println!("{}", linefold::wrap_indented("a short note", 12, 2));
+```
+
+```
+  a short
+  note
+```
+
 ## CLI usage
 
 The binary reads text from stdin and writes the wrapped result to
@@ -59,6 +72,12 @@ Width defaults to 80 columns if omitted:
 
 ```sh
 echo "some text to wrap" | linefold
+```
+
+Pass `--indent N` to indent every output line by `N` spaces:
+
+```sh
+echo "some text to wrap" | linefold 60 --indent 4
 ```
 
 ## Building

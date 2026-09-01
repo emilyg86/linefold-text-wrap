@@ -75,6 +75,34 @@ pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
+/// Wraps `text` to `width` columns like `wrap`, then indents every
+/// non-blank line by `indent` spaces. Words are packed into
+/// `width - indent` columns so the indent plus the wrapped text
+/// together never exceed `width`; the blank lines `wrap` uses to mark
+/// paragraph breaks are left untouched rather than indented.
+///
+/// `indent` is clamped to leave at least one column for content, so an
+/// indent as wide as or wider than `width` still produces output no
+/// wider than `width` instead of overflowing it.
+pub fn wrap_indented(text: &str, width: usize, indent: usize) -> String {
+    let width = width.max(1);
+    let indent = indent.min(width - 1);
+    let content_width = width - indent;
+    let prefix = " ".repeat(indent);
+
+    wrap(text, content_width)
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                String::new()
+            } else {
+                format!("{prefix}{line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Splits `text` into paragraphs, where a paragraph is one or more
 /// consecutive non-blank lines joined with single spaces. Runs of one or
 /// more blank lines separate paragraphs and collapse to a single break.
