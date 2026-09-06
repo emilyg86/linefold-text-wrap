@@ -1,17 +1,24 @@
 //! Greedy word wrapping for plain text.
 //!
 //! `wrap` takes text and a column width and returns the text reflowed so
-//! that no line exceeds that width, measured in characters. Blank lines in
-//! the input are treated as paragraph breaks and preserved; everything else
-//! (single newlines, tabs, runs of spaces) is collapsed to a single space
-//! before rewrapping, the same way most text formatters treat "soft" line
-//! breaks.
+//! that no line exceeds that width, measured in terminal display columns.
+//! Blank lines in the input are treated as paragraph breaks and
+//! preserved; everything else (single newlines, tabs, runs of spaces) is
+//! collapsed to a single space before rewrapping, the same way most text
+//! formatters treat "soft" line breaks.
 //!
-//! Width is counted in `char`s, not display columns, so this will
-//! misjudge combining marks and double-width glyphs (CJK, most emoji).
-//! Good enough for source comments, commit messages, and terminal output
-//! in a Latin alphabet; not a substitute for a Unicode line-breaking
-//! algorithm (UAX #14) if you need to handle arbitrary scripts correctly.
+//! Width accounts for combining marks (zero columns) and common wide
+//! East Asian scripts (two columns) via a hand-picked table, not the
+//! full Unicode East Asian Width property, and it doesn't cluster
+//! graphemes: a multi-codepoint emoji is measured codepoint by
+//! codepoint. Good enough for source comments, commit messages, and
+//! terminal output; not a substitute for a Unicode line-breaking
+//! algorithm (UAX #14) if you need to handle arbitrary scripts
+//! correctly.
+
+mod width;
+
+use width::{display_width, display_width_str};
 
 /// Wraps `text` to `width` columns, preserving paragraph breaks.
 ///
@@ -27,8 +34,8 @@ pub fn wrap(text: &str, width: usize) -> String {
 }
 
 /// Wraps a single paragraph (no embedded blank lines) into lines of at
-/// most `width` characters, breaking on whitespace and greedily packing
-/// as many words per line as fit.
+/// most `width` display columns, breaking on whitespace and greedily
+/// packing as many words per line as fit.
 ///
 /// A word longer than `width` on its own is hard-broken across multiple
 /// lines rather than left overflowing, since silently ignoring the width
@@ -40,7 +47,7 @@ pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
     let mut current_len = 0usize;
 
     for word in text.split_whitespace() {
-        let word_len = word.chars().count();
+        let word_len = display_width_str(word);
 
         if word_len > width {
             if !current.is_empty() {
@@ -130,20 +137,28 @@ fn split_paragraphs(text: &str) -> Vec<String> {
     paragraphs
 }
 
-/// Splits a single word into chunks of at most `width` characters each.
-/// Used when a word alone is too long to fit on any line.
+/// Splits a single word into chunks of at most `width` display columns
+/// each. Used when a word alone is too long to fit on any line.
+///
+/// A combining mark never starts a new chunk on its own: since it adds
+/// no columns, it stays attached to the character before it even if
+/// that pushes the chunk past `width`. A single character wider
+/// than `width` (a lone CJK character on a one-column line, say) is
+/// left on its own chunk rather than split, since there's no way to
+/// divide a character into partial columns.
 fn hard_break(word: &str, width: usize) -> Vec<String> {
     let mut chunks = Vec::new();
     let mut chunk = String::new();
-    let mut count = 0usize;
+    let mut chunk_width = 0usize;
 
     for ch in word.chars() {
-        if count == width {
+        let ch_width = display_width(ch);
+        if chunk_width + ch_width > width && !chunk.is_empty() {
             chunks.push(std::mem::take(&mut chunk));
-            count = 0;
+            chunk_width = 0;
         }
         chunk.push(ch);
-        count += 1;
+        chunk_width += ch_width;
     }
 
     if !chunk.is_empty() {

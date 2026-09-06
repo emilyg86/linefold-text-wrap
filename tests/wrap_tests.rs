@@ -100,6 +100,30 @@ fn wrap_table() {
             width: 0,
             expected: "a\nb\nc",
         },
+        Case {
+            name: "wide CJK characters count as two columns each",
+            input: "こんにちは",
+            width: 6,
+            expected: "こんに\nちは",
+        },
+        Case {
+            name: "a wide character wider than the width gets its own line",
+            input: "中 ab",
+            width: 1,
+            expected: "中\na\nb",
+        },
+        Case {
+            name: "combining marks add no width of their own",
+            input: "e\u{0301}e\u{0301}e\u{0301}",
+            width: 3,
+            expected: "e\u{0301}e\u{0301}e\u{0301}",
+        },
+        Case {
+            name: "a hard break keeps a combining mark with its base character",
+            input: "e\u{0301}e\u{0301}e\u{0301}e\u{0301}",
+            width: 2,
+            expected: "e\u{0301}e\u{0301}\ne\u{0301}e\u{0301}",
+        },
     ];
 
     let mut failures = Vec::new();

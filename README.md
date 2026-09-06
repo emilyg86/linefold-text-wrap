@@ -17,10 +17,12 @@ that logic that handles those cases on purpose instead of by accident.
   whitespace and collapsed.
 - Hard-breaks a word that's longer than the requested width on its own,
   instead of leaving a line that overflows.
-- Counts width in characters, not display columns. That's fine for text
-  that's mostly Latin script; it will misjudge wide glyphs like CJK
-  characters and most emoji, since those render as two columns wide but
-  count as one character.
+- Counts width in terminal display columns, not raw characters: a
+  combining mark adds no width and common wide East Asian scripts (CJK
+  ideographs, Hangul, fullwidth forms) count as two columns. The table
+  behind this is hand-picked, not a full copy of the Unicode East Asian
+  Width property, and it doesn't cluster graphemes, so an emoji built
+  from several codepoints is still measured codepoint by codepoint.
 
 ## Library usage
 
