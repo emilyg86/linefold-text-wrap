@@ -16,7 +16,10 @@ that logic that handles those cases on purpose instead of by accident.
   else (single newlines, tabs, repeated spaces) is treated as ordinary
   whitespace and collapsed.
 - Hard-breaks a word that's longer than the requested width on its own,
-  instead of leaving a line that overflows.
+  instead of leaving a line that overflows. If the word already has a
+  soft hyphen (U+00AD) marking where it may be split, that's used as the
+  break point and rendered as a `-`; a soft hyphen that isn't needed is
+  dropped rather than left in the output.
 - Counts width in terminal display columns, not raw characters: a
   combining mark adds no width and common wide East Asian scripts (CJK
   ideographs, Hangul, fullwidth forms) count as two columns. The table

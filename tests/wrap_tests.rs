@@ -124,6 +124,25 @@ fn wrap_table() {
             width: 2,
             expected: "e\u{0301}e\u{0301}\ne\u{0301}e\u{0301}",
         },
+        Case {
+            name: "an overlong word breaks at a soft hyphen instead of mid-character",
+            input: "auto\u{00AD}mobile",
+            width: 6,
+            expected: "auto-\nmobile",
+        },
+        Case {
+            name: "a soft hyphen in a word that already fits is dropped, not printed",
+            input: "auto\u{00AD}mobile",
+            width: 20,
+            expected: "automobile",
+        },
+        Case {
+            name: "a soft hyphen break is kept even when the next segment still \
+                   needs a hard break",
+            input: "un\u{00AD}bearable",
+            width: 3,
+            expected: "un-\nbea\nrab\nle",
+        },
     ];
 
     let mut failures = Vec::new();

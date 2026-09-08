@@ -55,6 +55,7 @@ fn is_combining(cp: u32) -> bool {
         | 0x200C          // zero width non-joiner
         | 0x200D          // zero width joiner
         | 0xFEFF          // zero width no-break space / BOM
+        | 0x00AD          // soft hyphen: invisible unless it's where a line breaks
     )
 }
 
@@ -91,6 +92,7 @@ mod tests {
     fn combining_marks_are_zero_columns() {
         assert_eq!(display_width('\u{0301}'), 0); // combining acute accent
         assert_eq!(display_width('\u{200D}'), 0); // zero width joiner
+        assert_eq!(display_width('\u{00AD}'), 0); // soft hyphen
     }
 
     #[test]

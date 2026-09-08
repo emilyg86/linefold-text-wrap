@@ -20,6 +20,12 @@ mod width;
 
 use width::{display_width, display_width_str};
 
+/// Marks an optional break point inside a word (U+00AD). It's invisible
+/// in ordinary text; `wrap_words` treats it as a hint for where to break
+/// an overlong word, printing a literal `-` at the point it actually
+/// uses and dropping the mark everywhere else.
+const SOFT_HYPHEN: char = '\u{00AD}';
+
 /// Wraps `text` to `width` columns, preserving paragraph breaks.
 ///
 /// A width of `0` is treated as `1`, since a line that can hold nothing
@@ -37,9 +43,13 @@ pub fn wrap(text: &str, width: usize) -> String {
 /// most `width` display columns, breaking on whitespace and greedily
 /// packing as many words per line as fit.
 ///
-/// A word longer than `width` on its own is hard-broken across multiple
+/// A word longer than `width` on its own is broken across multiple
 /// lines rather than left overflowing, since silently ignoring the width
-/// limit would defeat the point of wrapping.
+/// limit would defeat the point of wrapping. A soft hyphen (U+00AD)
+/// already present in the word is used as the preferred break point,
+/// with a `-` printed at the line it breaks; a word with no soft
+/// hyphens, or one that still doesn't fit between them, falls back to
+/// breaking mid-character.
 pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
     let width = width.max(1);
     let mut lines = Vec::new();
@@ -54,23 +64,24 @@ pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
                 lines.push(std::mem::take(&mut current));
                 current_len = 0;
             }
-            lines.extend(hard_break(word, width));
+            lines.extend(hyphenate(word, width));
             continue;
         }
 
         // +1 accounts for the space that would join this word to the
         // current line; there's no such cost when the line is empty.
         let extra = if current.is_empty() { word_len } else { word_len + 1 };
+        let word = strip_soft_hyphens(word);
 
         if current_len + extra > width {
             lines.push(std::mem::take(&mut current));
-            current.push_str(word);
+            current.push_str(&word);
             current_len = word_len;
         } else {
             if !current.is_empty() {
                 current.push(' ');
             }
-            current.push_str(word);
+            current.push_str(&word);
             current_len += extra;
         }
     }
@@ -80,6 +91,16 @@ pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
     }
 
     lines
+}
+
+/// Drops any soft hyphens from `word`, since one that didn't end up at
+/// a line break has no business appearing in the output.
+fn strip_soft_hyphens(word: &str) -> std::borrow::Cow<'_, str> {
+    if word.contains(SOFT_HYPHEN) {
+        std::borrow::Cow::Owned(word.chars().filter(|&c| c != SOFT_HYPHEN).collect())
+    } else {
+        std::borrow::Cow::Borrowed(word)
+    }
 }
 
 /// Wraps `text` to `width` columns like `wrap`, then indents every
@@ -135,6 +156,71 @@ fn split_paragraphs(text: &str) -> Vec<String> {
     }
 
     paragraphs
+}
+
+/// Splits an overlong `word` into chunks of at most `width` display
+/// columns each, preferring to break at soft hyphens already present in
+/// the word over breaking mid-character.
+///
+/// Each segment between soft hyphens is packed onto the current chunk
+/// greedily, the same way `wrap_words` packs words onto a line, except
+/// the separator here is a `-` charged only when a break actually lands
+/// between two segments, not the segments' natural join. A segment
+/// wider than `width` on its own still falls back to `hard_break`,
+/// since a soft hyphen can't help split something that has no smaller
+/// pieces to offer.
+fn hyphenate(word: &str, width: usize) -> Vec<String> {
+    if !word.contains(SOFT_HYPHEN) {
+        return hard_break(word, width);
+    }
+
+    let segments: Vec<&str> = word.split(SOFT_HYPHEN).collect();
+    let last = segments.len() - 1;
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+    let mut current_len = 0usize;
+
+    for (i, segment) in segments.iter().copied().enumerate() {
+        let segment_len = display_width_str(segment);
+
+        if segment_len > width {
+            if !current.is_empty() {
+                if current_len < width {
+                    current.push('-');
+                }
+                chunks.push(std::mem::take(&mut current));
+                current_len = 0;
+            }
+            chunks.extend(hard_break(segment, width));
+            continue;
+        }
+
+        // Reserve a column for a trailing hyphen unless this is the
+        // word's last segment, since at this point there's no way to
+        // know yet whether another segment will follow it onto the
+        // same chunk.
+        let reserve = if i == last { 0 } else { 1 };
+
+        if current_len + segment_len + reserve > width && !current.is_empty() {
+            // A chunk already at `width` (only possible when `width`
+            // is too narrow to fit even one column of hyphen) is left
+            // without one rather than pushed over the limit.
+            if current_len < width {
+                current.push('-');
+            }
+            chunks.push(std::mem::take(&mut current));
+            current_len = 0;
+        }
+
+        current.push_str(segment);
+        current_len += segment_len;
+    }
+
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    chunks
 }
 
 /// Splits a single word into chunks of at most `width` display columns
