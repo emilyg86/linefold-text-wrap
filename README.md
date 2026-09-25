@@ -64,6 +64,20 @@ println!("{}", linefold::wrap_indented("a short note", 12, 2));
   note
 ```
 
+`fill` wraps like `wrap` but also pads every line out to the full width,
+left, right, or center aligned:
+
+```rust
+use linefold::Alignment;
+
+println!("{}", linefold::fill("one two three", 7, Alignment::Right));
+```
+
+```
+one two
+  three
+```
+
 ## CLI usage
 
 The binary reads text from stdin and writes the wrapped result to

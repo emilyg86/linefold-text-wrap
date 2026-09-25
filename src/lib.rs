@@ -7,6 +7,10 @@
 //! collapsed to a single space before rewrapping, the same way most text
 //! formatters treat "soft" line breaks.
 //!
+//! `fill` does the same wrapping but pads each line out to the full
+//! width, left, right, or center aligned, for callers that want a block
+//! of text with a straight edge rather than a ragged one.
+//!
 //! Width accounts for combining marks (zero columns) and common wide
 //! East Asian scripts (two columns) via a hand-picked table, not the
 //! full Unicode East Asian Width property, and it doesn't cluster
@@ -37,6 +41,61 @@ pub fn wrap(text: &str, width: usize) -> String {
         .map(|p| wrap_words(p, width).join("\n"))
         .collect::<Vec<_>>()
         .join("\n\n")
+}
+
+/// How `fill` pads a wrapped line out to the full column width.
+///
+/// `Left` is wrap's own behavior: no trailing padding, since nothing
+/// downstream cares about trailing spaces on a left-aligned line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Alignment {
+    Left,
+    Right,
+    Center,
+}
+
+/// Wraps `text` like `wrap`, then pads every line out to `width` columns
+/// according to `alignment`.
+///
+/// Padding is spaces added around the line, not spaces inserted between
+/// words, so a line's own word spacing is untouched. A line already at
+/// or past `width` (only possible for a hard-broken chunk of an overlong
+/// word) is left as-is rather than padded into a negative width.
+pub fn fill(text: &str, width: usize, alignment: Alignment) -> String {
+    let width = width.max(1);
+    split_paragraphs(text)
+        .iter()
+        .map(|p| {
+            wrap_words(p, width)
+                .into_iter()
+                .map(|line| pad_line(&line, width, alignment))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// Pads `line` to `width` display columns per `alignment`.
+fn pad_line(line: &str, width: usize, alignment: Alignment) -> String {
+    let line_width = display_width_str(line);
+    if line_width >= width {
+        return line.to_string();
+    }
+
+    let padding = width - line_width;
+    match alignment {
+        Alignment::Left => line.to_string(),
+        Alignment::Right => format!("{}{line}", " ".repeat(padding)),
+        Alignment::Center => {
+            // The odd column, if any, goes on the right so a centered
+            // line that can't split evenly still looks left-leaning
+            // rather than drifting right.
+            let left = padding / 2;
+            let right = padding - left;
+            format!("{}{line}{}", " ".repeat(left), " ".repeat(right))
+        }
+    }
 }
 
 /// Wraps a single paragraph (no embedded blank lines) into lines of at

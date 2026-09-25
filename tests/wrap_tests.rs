@@ -1,4 +1,4 @@
-use linefold::{wrap, wrap_indented};
+use linefold::{fill, wrap, wrap_indented, Alignment};
 
 struct Case {
     name: &'static str,
@@ -214,6 +214,89 @@ fn wrap_indented_table() {
             failures.push(format!(
                 "case '{}' failed:\n  input:    {:?}\n  width:    {}\n  indent:   {}\n  expected: {:?}\n  got:      {:?}",
                 case.name, case.input, case.width, case.indent, case.expected, got
+            ));
+        }
+    }
+
+    assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
+}
+
+struct FillCase {
+    name: &'static str,
+    input: &'static str,
+    width: usize,
+    alignment: Alignment,
+    expected: &'static str,
+}
+
+#[test]
+fn fill_table() {
+    let cases = vec![
+        FillCase {
+            name: "left alignment matches wrap exactly",
+            input: "one two three",
+            width: 7,
+            alignment: Alignment::Left,
+            expected: "one two\nthree",
+        },
+        FillCase {
+            name: "right alignment pads each line on the left",
+            input: "one two three",
+            width: 7,
+            alignment: Alignment::Right,
+            expected: "one two\n  three",
+        },
+        FillCase {
+            name: "center alignment splits padding evenly on both sides",
+            input: "one two three",
+            width: 9,
+            alignment: Alignment::Center,
+            expected: " one two \n  three  ",
+        },
+        FillCase {
+            name: "a line already at width gets no padding",
+            input: "hello",
+            width: 5,
+            alignment: Alignment::Right,
+            expected: "hello",
+        },
+        FillCase {
+            name: "odd padding puts the extra column on the right",
+            input: "hello",
+            width: 4,
+            alignment: Alignment::Center,
+            expected: "hell\n o  ",
+        },
+        FillCase {
+            name: "paragraph breaks stay unpadded between paragraphs",
+            input: "hi\n\nbye",
+            width: 6,
+            alignment: Alignment::Right,
+            expected: "    hi\n\n   bye",
+        },
+        FillCase {
+            name: "empty input stays empty regardless of alignment",
+            input: "",
+            width: 10,
+            alignment: Alignment::Center,
+            expected: "",
+        },
+        FillCase {
+            name: "wide CJK characters count toward padding by display width",
+            input: "中 a",
+            width: 6,
+            alignment: Alignment::Right,
+            expected: "  中 a",
+        },
+    ];
+
+    let mut failures = Vec::new();
+    for case in &cases {
+        let got = fill(case.input, case.width, case.alignment);
+        if got != case.expected {
+            failures.push(format!(
+                "case '{}' failed:\n  input:    {:?}\n  width:    {}\n  alignment: {:?}\n  expected: {:?}\n  got:      {:?}",
+                case.name, case.input, case.width, case.alignment, case.expected, got
             ));
         }
     }
